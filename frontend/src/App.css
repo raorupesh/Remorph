@@ -170,6 +170,28 @@
   box-shadow: 0 0 0 3px #2563eb22;
 }
 
+.field-file {
+  padding: 0.5rem;
+  border-radius: 12px;
+  border: 2px dashed #cbd5e1;
+  background-color: #ffffff;
+  color: #475569;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 200ms ease;
+}
+
+.field-file:hover {
+  border-color: #94a3b8;
+  background-color: #f9fafb;
+}
+
+.field-file:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px #2563eb22;
+}
+
 textarea {
   flex: 1;
   padding: 1rem;
@@ -230,6 +252,31 @@ textarea[readonly] {
   opacity: 0.5;
   cursor: not-allowed;
   box-shadow: none;
+}
+
+.explanation-box {
+  padding: 1rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f0fdf4 0%, #f0fff4 100%);
+  border: 1px solid #86efac;
+  margin-bottom: 0.5rem;
+  animation: panel-in 520ms ease;
+}
+
+.explanation-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #166534;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.explanation-text {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #166534;
 }
 
 .error-text {
