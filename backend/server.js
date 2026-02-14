@@ -12,7 +12,7 @@ app.use(cors())
 app.use(express.json({ limit: '1mb' }))
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' })
+const model = genAI.getGenerativeModel({ model: process.env.MODEL })	
 
 app.post('/api/refactor', async (req, res) => {
 	const { code, language } = req.body || {}
