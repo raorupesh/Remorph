@@ -20,6 +20,20 @@ This document outlines the implementation of Stories 2, 3, and 4 for the Remorph
 - **Change Explanation**: Displays a brief explanation of refactoring changes
 - **Formatted Display**: Shows explanation in a highlighted box above the refactored code
 
+#### Story 5: AI Service Integration
+- **Gemini API**: Sends code to Google Gemini 1.5 Flash for refactoring
+- **Secure Configuration**: API key stored in backend `.env` file
+- **Response Parsing**: Extracts refactored code and explanation from API response
+
+#### Story 6: Side-by-Side Diff View
+- **Dual View Modes**: Toggle between "Code View" and "Diff View"
+- **Change Highlighting**: 
+  - Green highlight for added code
+  - Red with strikethrough for removed code
+  - Normal display for unchanged code
+- **Color-Coded Changes**: Easy visual identification of what was changed
+- **Semantic Cleanup**: Optimized diff output for readability
+
 ---
 
 ## Setup Instructions
@@ -83,13 +97,30 @@ The frontend will typically be available at `http://localhost:5173`
 2. Paste your source code into the text area
 3. Click the "Refactor" button
 4. View the refactored code and explanation
+5. **Optional**: Switch to "Diff View" to see highlighted changes
 
 ### Method 2: Upload File
 1. Click "Or upload a file" button
 2. Select a source code file (extensions: .js, .ts, .py, .java, .cs, .cpp, .go, .rb, .php)
 3. Language will auto-detect based on file extension
 4. Click "Refactor" button
-5. View results
+5. View results with optional Diff View
+
+### Viewing Changes
+
+After refactoring, you can view results in two ways:
+
+#### Code View
+- Display the complete refactored code
+- Perfect for copying the result
+- Clean, readable monospace font
+
+#### Diff View
+- Side-by-side comparison showing exactly what changed
+- **Green highlights**: Code additions
+- **Red strikethrough**: Code deletions
+- **Normal text**: Unchanged portions
+- Ideal for understanding the refactoring process
 
 ---
 
@@ -109,11 +140,21 @@ The frontend will typically be available at `http://localhost:5173`
 - Enhanced API response handling to capture explanation
 - Added explanation display box with styling
 - File input with dashed border styling
+- **New**: Added `viewMode` state for toggling between Code and Diff views
+- **New**: Integrated `diff-match-patch` library for computing line-by-line diffs
+- **New**: Created `renderDiffView()` function with color-coded diff display
+- **New**: Added view mode toggle buttons (Code View / Diff View)
 
 ### Styling
 - Added `.field-file` class for file input styling
 - Added `.explanation-box`, `.explanation-title`, `.explanation-text` classes for explanation display
 - Green highlight for explanation box to distinguish from other content
+- **New**: Added `.view-mode-tabs` and `.view-tab` classes for toggle buttons
+- **New**: Added `.diff-container` and `.diff-content` classes for diff container
+- **New**: Added `.diff-unchanged`, `.diff-removed`, `.diff-added` classes for visual diff highlighting
+  - Removed code: Red background with strikethrough (#fee2e2 background, #991b1b text)
+  - Added code: Green background (#dcfce7 background, #166534 text, bold font)
+  - Unchanged code: Normal text color without highlighting
 
 ---
 

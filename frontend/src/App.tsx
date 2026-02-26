@@ -1,6 +1,9 @@
 import { useState } from 'react'
+import DiffMatchPatch from 'diff-match-patch'
 import remorphLogo from './assets/Remporph-logo.png'
 import './App.css'
+
+const dmp = new DiffMatchPatch()
 
 function App() {
   const [language, setLanguage] = useState('')
@@ -9,6 +12,7 @@ function App() {
   const [explanation, setExplanation] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'code' | 'diff'>('code')
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -47,6 +51,7 @@ function App() {
     setError(null)
     setRefactoredCode('')
     setExplanation('')
+    setViewMode('code')
 
     try {
       const response = await fetch('http://localhost:3000/api/refactor', {
@@ -72,6 +77,105 @@ function App() {
     }
   }
 
+  const renderDiffView = () => {
+    if (!sourceCode || !refactoredCode) return null
+
+    // Compute diff-match-patch diffs
+    const diffs = dmp.diff_main(sourceCode, refactoredCode)
+    dmp.diff_cleanupSemantic(diffs)
+
+    // Parse diffs into lines with proper tracking
+    const diffLines: Array<{
+      type: 'add' | 'remove' | 'context'
+      content: string
+      oldLineNum?: number
+      newLineNum?: number
+    }> = []
+
+    let oldLineNum = 1
+    let newLineNum = 1
+
+    for (const [operation, text] of diffs) {
+      const lines = text.split('\n')
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]
+
+        // Skip the last empty line from split
+        if (i === lines.length - 1 && line === '') continue
+
+        if (operation === 0) {
+          // Context (unchanged)
+          diffLines.push({
+            type: 'context',
+            content: line,
+            oldLineNum,
+            newLineNum,
+          })
+          oldLineNum++
+          newLineNum++
+        } else if (operation === -1) {
+          // Remove
+          diffLines.push({
+            type: 'remove',
+            content: line,
+            oldLineNum,
+            newLineNum: undefined,
+          })
+          oldLineNum++
+        } else if (operation === 1) {
+          // Add
+          diffLines.push({
+            type: 'add',
+            content: line,
+            oldLineNum: undefined,
+            newLineNum,
+          })
+          newLineNum++
+        }
+      }
+    }
+
+    // Filter out certain empty contexts for cleaner display
+    const displayLines = diffLines.filter((line, idx) => {
+      if (line.content === '') {
+        // Keep empty lines only if they're between changes
+        const prevLine = idx > 0 ? diffLines[idx - 1] : null
+        const nextLine = idx < diffLines.length - 1 ? diffLines[idx + 1] : null
+        return (prevLine?.type !== 'context' || nextLine?.type !== 'context')
+      }
+      return true
+    })
+
+    return (
+      <div className="diff-container">
+        <div className="diff-header">
+          <span className="diff-file-info">📝 Code Changes (Original → Refactored)</span>
+        </div>
+        <table className="diff-table">
+          <tbody>
+            {displayLines.map((line, index) => (
+              <tr key={index} className={`diff-line diff-line-${line.type}`}>
+                <td className="diff-line-number diff-line-number-old" title="Original line">
+                  {line.oldLineNum !== undefined ? line.oldLineNum : ''}
+                </td>
+                <td className="diff-line-number diff-line-number-new" title="Refactored line">
+                  {line.newLineNum !== undefined ? line.newLineNum : ''}
+                </td>
+                <td className="diff-line-prefix">
+                  {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
+                </td>
+                <td className="diff-line-content">
+                  <code>{line.content || '\u00A0'}</code>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
   return (
     <div className="app-shell">
       <header className="top-bar">
@@ -85,7 +189,7 @@ function App() {
         </div>
       </header>
 
-      <main className="main-layout">
+      <div className="top-layout">
         <section className="pane">
           <div className="pane-header">
             <h2>Source code</h2>
@@ -151,25 +255,46 @@ function App() {
 
         <section className="pane">
           <div className="pane-header">
-            <h2>Refactored code & explanation</h2>
+            <h2>Refactored code</h2>
             <span className="pane-tag">Output</span>
           </div>
 
-          {explanation && (
-            <div className="explanation-box">
-              <h3 className="explanation-title">Changes Made</h3>
-              <p className="explanation-text">{explanation}</p>
-            </div>
+          {refactoredCode && (
+            <textarea
+              id="refactored"
+              value={refactoredCode}
+              readOnly
+              placeholder="Refactored code will appear here."
+            />
           )}
 
-          <textarea
-            id="refactored"
-            value={refactoredCode}
-            readOnly
-            placeholder="Refactored code will appear here."
-          />
+          {!refactoredCode && (
+            <div className="empty-state">
+              <p>Refactored code will appear here</p>
+            </div>
+          )}
         </section>
-      </main>
+      </div>
+
+      {explanation && (
+        <section className="explanation-section">
+          <div className="section-header">
+            <h2>Changes Made</h2>
+          </div>
+          <div className="explanation-card">
+            <p className="explanation-text">{explanation}</p>
+          </div>
+        </section>
+      )}
+
+      {refactoredCode && (
+        <section className="diff-section">
+          <div className="section-header">
+            <h2>Code Diff View</h2>
+          </div>
+          {renderDiffView()}
+        </section>
+      )}
     </div>
   )
 }
