@@ -1,9 +1,88 @@
 import { useState } from 'react'
-import DiffMatchPatch from 'diff-match-patch'
+import ReactDiffViewer from 'react-diff-viewer-continued'
 import remorphLogo from './assets/Remporph-logo.png'
 import './App.css'
 
-const dmp = new DiffMatchPatch()
+const githubDiffStyles = {
+  variables: {
+    light: {
+      diffViewerBackground: '#ffffff',
+      diffViewerColor: '#24292f',
+      diffViewerTitleBackground: '#f6f8fa',
+      diffViewerTitleColor: '#24292f',
+      diffViewerTitleBorderColor: '#d0d7de',
+      gutterBackground: '#f6f8fa',
+      gutterBackgroundDark: '#eef2f6',
+      gutterColor: '#57606a',
+      addedBackground: '#e6ffec',
+      addedGutterBackground: '#ccffd8',
+      addedColor: '#24292f',
+      removedBackground: '#ffebe9',
+      removedGutterBackground: '#ffd7d5',
+      removedColor: '#24292f',
+      wordAddedBackground: '#abf2bc',
+      wordRemovedBackground: '#ffc1ba',
+      codeFoldBackground: '#f6f8fa',
+      codeFoldGutterBackground: '#f6f8fa',
+      codeFoldContentColor: '#57606a',
+      emptyLineBackground: '#ffffff',
+      highlightBackground: '#fff8c5',
+      highlightGutterBackground: '#fff1a8',
+    },
+  },
+  diffContainer: {
+    border: '1px solid #d0d7de',
+    borderRadius: '6px',
+    minWidth: '100%',
+    fontSize: '13px',
+  },
+  titleBlock: {
+    padding: '10px 12px',
+    fontSize: '12px',
+    fontWeight: 600,
+    lineHeight: '20px',
+  },
+  contentText: {
+    fontFamily: "ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, 'Liberation Mono', monospace",
+    fontSize: '12px',
+    lineHeight: '20px',
+  },
+  lineNumber: {
+    fontSize: '12px',
+  },
+  gutter: {
+    minWidth: '44px',
+    width: '44px',
+    padding: '0 8px',
+  },
+  marker: {
+    width: '24px',
+    minWidth: '24px',
+    padding: '0 6px',
+  },
+}
+
+interface CodeSmell {
+  type: string
+  function?: string
+  functions?: string[]
+  location?: string
+  details: string
+  similarity?: number
+}
+
+interface CodeSmellAnalysis {
+  detected: CodeSmell[]
+  summary: {
+    totalFunctions: number
+    totalSmells: number
+    functions: Array<{
+      name: string
+      statements: number
+      lines: number
+    }>
+  }
+}
 
 function App() {
   const [language, setLanguage] = useState('')
@@ -12,7 +91,7 @@ function App() {
   const [explanation, setExplanation] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'code' | 'diff'>('code')
+  const [codeSmellAnalysis, setCodeSmellAnalysis] = useState<CodeSmellAnalysis | null>(null)
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -51,7 +130,7 @@ function App() {
     setError(null)
     setRefactoredCode('')
     setExplanation('')
-    setViewMode('code')
+    setCodeSmellAnalysis(null)
 
     try {
       const response = await fetch('http://localhost:3000/api/refactor', {
@@ -67,113 +146,19 @@ function App() {
         throw new Error(data.error || 'Failed to refactor code')
       }
 
-      const data: { refactoredCode?: string; explanation?: string } = await response.json()
+      const data: {
+        refactoredCode?: string
+        explanation?: string
+        codeSmellAnalysis?: CodeSmellAnalysis
+      } = await response.json()
       setRefactoredCode(data.refactoredCode ?? '')
       setExplanation(data.explanation ?? '')
+      setCodeSmellAnalysis(data.codeSmellAnalysis ?? null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unexpected error')
     } finally {
       setLoading(false)
     }
-  }
-
-  const renderDiffView = () => {
-    if (!sourceCode || !refactoredCode) return null
-
-    // Compute diff-match-patch diffs
-    const diffs = dmp.diff_main(sourceCode, refactoredCode)
-    dmp.diff_cleanupSemantic(diffs)
-
-    // Parse diffs into lines with proper tracking
-    const diffLines: Array<{
-      type: 'add' | 'remove' | 'context'
-      content: string
-      oldLineNum?: number
-      newLineNum?: number
-    }> = []
-
-    let oldLineNum = 1
-    let newLineNum = 1
-
-    for (const [operation, text] of diffs) {
-      const lines = text.split('\n')
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i]
-
-        // Skip the last empty line from split
-        if (i === lines.length - 1 && line === '') continue
-
-        if (operation === 0) {
-          // Context (unchanged)
-          diffLines.push({
-            type: 'context',
-            content: line,
-            oldLineNum,
-            newLineNum,
-          })
-          oldLineNum++
-          newLineNum++
-        } else if (operation === -1) {
-          // Remove
-          diffLines.push({
-            type: 'remove',
-            content: line,
-            oldLineNum,
-            newLineNum: undefined,
-          })
-          oldLineNum++
-        } else if (operation === 1) {
-          // Add
-          diffLines.push({
-            type: 'add',
-            content: line,
-            oldLineNum: undefined,
-            newLineNum,
-          })
-          newLineNum++
-        }
-      }
-    }
-
-    // Filter out certain empty contexts for cleaner display
-    const displayLines = diffLines.filter((line, idx) => {
-      if (line.content === '') {
-        // Keep empty lines only if they're between changes
-        const prevLine = idx > 0 ? diffLines[idx - 1] : null
-        const nextLine = idx < diffLines.length - 1 ? diffLines[idx + 1] : null
-        return (prevLine?.type !== 'context' || nextLine?.type !== 'context')
-      }
-      return true
-    })
-
-    return (
-      <div className="diff-container">
-        <div className="diff-header">
-          <span className="diff-file-info">📝 Code Changes (Original → Refactored)</span>
-        </div>
-        <table className="diff-table">
-          <tbody>
-            {displayLines.map((line, index) => (
-              <tr key={index} className={`diff-line diff-line-${line.type}`}>
-                <td className="diff-line-number diff-line-number-old" title="Original line">
-                  {line.oldLineNum !== undefined ? line.oldLineNum : ''}
-                </td>
-                <td className="diff-line-number diff-line-number-new" title="Refactored line">
-                  {line.newLineNum !== undefined ? line.newLineNum : ''}
-                </td>
-                <td className="diff-line-prefix">
-                  {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
-                </td>
-                <td className="diff-line-content">
-                  <code>{line.content || '\u00A0'}</code>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    )
   }
 
   return (
@@ -276,13 +261,44 @@ function App() {
         </section>
       </div>
 
+      {codeSmellAnalysis && codeSmellAnalysis.detected.length > 0 && (
+        <section className="code-smell-section">
+          <div className="section-header">
+            <h2>Detected Code Smells</h2>
+          </div>
+          <div className="code-smell-list">
+            {codeSmellAnalysis.detected.map((smell, index) => (
+              <div key={index} className="code-smell-item">
+                <div className="code-smell-header">
+                  <span className="code-smell-type">{smell.type}</span>
+                  <span className="code-smell-location">
+                    {smell.function && `in function '${smell.function}'`}
+                    {smell.functions && `between '${smell.functions.join("' and '")}'`}
+                  </span>
+                </div>
+                <p className="code-smell-details">{smell.details}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {explanation && (
         <section className="explanation-section">
           <div className="section-header">
             <h2>Changes Made</h2>
           </div>
           <div className="explanation-card">
-            <p className="explanation-text">{explanation}</p>
+            <ul className="explanation-list">
+              {explanation
+                .split('\n')
+                .filter((line) => line.trim())
+                .map((line, index) => (
+                  <li key={index} className="explanation-item">
+                    {line.replace(/\*\*/g, '').trim()}
+                  </li>
+                ))}
+            </ul>
           </div>
         </section>
       )}
@@ -292,7 +308,24 @@ function App() {
           <div className="section-header">
             <h2>Code Diff View</h2>
           </div>
-          {renderDiffView()}
+          <div className="diff-viewer-container">
+            <div className="github-diff-meta">
+              <span className="github-diff-file">refactor-result.{language || 'txt'}</span>
+            </div>
+            <div className="diff-tags-row" aria-label="Diff column labels">
+              <span className="diff-tag diff-tag-original">Original Code</span>
+              <span className="diff-tag diff-tag-refactored">Refactored Code</span>
+            </div>
+            <ReactDiffViewer
+              oldValue={sourceCode}
+              newValue={refactoredCode}
+              splitView={true}
+              hideLineNumbers={false}
+              showDiffOnly={false}
+              useDarkTheme={false}
+              styles={githubDiffStyles}
+            />
+          </div>
         </section>
       )}
     </div>
